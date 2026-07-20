@@ -1,2 +1,11 @@
-# Participants
-Skeletal codes for participants
+# 2026 HAIC - CarRacing AI Challenge 🏎️
+
+본 레포지토리는 2026 HAIC 대회 참가를 위한 공식 로컬 학습 템플릿입니다. 
+참가자는 주어진 템플릿을 활용하여 가장 빠르고 안정적으로 트랙을 완주하는 강화학습 모델을 개발해야 합니다.
+
+## ⚙️ 환경 설정 방법
+
+1. 레포지토리를 로컬에 클론합니다.
+2. 가상 환경을 생성하고 의존성 패키지를 설치합니다.
+   ```bash
+   pip install -r requirements.txt

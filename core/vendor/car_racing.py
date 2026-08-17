@@ -18,6 +18,7 @@ from gymnasium.utils import EzPickle
 
 from core.obstacle_contacts import (
     ObstacleUserData,
+    clear_obstacle_hit,
     mark_first_obstacle_hit,
     match_obstacle_body,
 )
@@ -128,7 +129,13 @@ class FrictionDetector(contactListener):
 
 
 class VariablesContactDetector(FrictionDetector):
-    """Preserve road contacts and add one-shot obstacle collision events."""
+    """Preserve road contacts and add per-encounter obstacle collision events.
+
+    Each obstacle counts once per continuous contact -- re-touching the same
+    obstacle after fully separating (a new BeginContact following an
+    EndContact) counts again, matching how collision damage is conventionally
+    modeled in driving games (docs/game-variables-design.md section 4.3).
+    """
 
     def _match_obstacle_contact(self, contact):
         if self.env.car is None:
@@ -142,11 +149,14 @@ class VariablesContactDetector(FrictionDetector):
 
     def _contact(self, contact, begin):
         super()._contact(contact, begin)
-        if not begin:
-            return
         obstacle_body = self._match_obstacle_contact(contact)
-        if mark_first_obstacle_hit(obstacle_body):
-            self.env._collision_this_step = True
+        if obstacle_body is None:
+            return
+        if begin:
+            if mark_first_obstacle_hit(obstacle_body):
+                self.env._collision_this_step = True
+        else:
+            clear_obstacle_hit(obstacle_body)
 
 
 class CarRacing(gym.Env, EzPickle):

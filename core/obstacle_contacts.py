@@ -39,8 +39,20 @@ def match_obstacle_body(body_a, body_b, car_bodies: Iterable):
 
 
 def mark_first_obstacle_hit(obstacle_body) -> bool:
-    """Mark and report the first hit; every later contact returns False."""
+    """Mark and report a hit; already-touching contact returns False.
+
+    Pair with clear_obstacle_hit() on the matching EndContact so a vehicle
+    that fully separates and later re-collides with the same obstacle is
+    counted again -- only a single continuous contact (BeginContact without
+    an intervening EndContact) is deduplicated.
+    """
     if obstacle_body is None or obstacle_body.userData.hit:
         return False
     obstacle_body.userData.hit = True
     return True
+
+
+def clear_obstacle_hit(obstacle_body) -> None:
+    """Re-arm the obstacle once contact fully ends (Box2D EndContact)."""
+    if obstacle_body is not None:
+        obstacle_body.userData.hit = False

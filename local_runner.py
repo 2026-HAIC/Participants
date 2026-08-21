@@ -8,6 +8,14 @@ from env_wrapper import CarEnvironment
 from agent import Agent
 
 
+def calculate_score(progress: float, steps: int) -> float:
+    """공식 채점(RuleChecker.calculate_score)과 동일한 공식.
+    완주(진행률 95% 이상)면 걸린 스텝 수, 아니면 -진행률."""
+    if progress >= 0.95:
+        return float(steps)
+    return -progress
+
+
 def run_local_test(track_id, seed, max_steps, frame_skip):
     print("=== 시작: 로컬 환경 테스트 ===")
     
@@ -50,9 +58,14 @@ def run_local_test(track_id, seed, max_steps, frame_skip):
                 f"손상: {info['damage']:.0%}"
             )
 
+    progress = info.get("progress", 0.0)
+    score = calculate_score(progress, steps)
+
     print("=== 종료: 로컬 환경 테스트 ===")
     print(f"최종 스텝: {steps}")
     print(f"최종 누적 보상: {total_reward:.2f}")
+    print(f"진행률: {progress:.1%}")
+    print(f"공식 점수 (완주 시 스텝 수 / 미완주 시 -진행률): {score:.4f}")
     if info.get("retire_reason"):
         print(f"리타이어 사유: {info['retire_reason']}")
     

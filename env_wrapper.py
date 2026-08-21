@@ -56,6 +56,11 @@ class CarEnvironment(gym.Wrapper):
         return self.stack_state, info
 
     def step(self, action):
+        # pyBox2D의 SetMotorSpeed 바인딩은 numpy.float32 액션을 못 받아들이고
+        # TypeError를 던진다 (agent.py 더미 예시처럼 float32로 반환하는 모델이 흔함).
+        # 공식 서버는 _safe_act()의 np.clip이 우연히 float64로 승격시켜 이 문제를
+        # 피해가지만, 로컬 환경엔 그 계층이 없어서 여기서 직접 캐스팅한다.
+        action = np.asarray(action, dtype=np.float64)
         total_reward = 0
         collision = False
         for _ in range(self._skip_frames):

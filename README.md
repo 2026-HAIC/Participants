@@ -12,13 +12,19 @@
 - 공식 평가 서버: Python 3.11, CPU 환경
 - Windows, macOS 또는 Linux
 
+먼저 참가자 저장소를 clone하고 저장소 루트로 이동합니다.
+
+```bash
+git clone https://github.com/2026-HAIC/Participants.git
+cd Participants
+```
+
 Python 3.12 이상에서는 고정된 PyTorch 및 Box2D 버전이 설치되지 않을 수 있습니다.
 가상 환경을 만든 뒤 아래 명령을 실행하십시오.
 
 ### Windows PowerShell
 
 ```powershell
-cd Participants
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -28,7 +34,6 @@ python -m pip install -r requirements.txt
 ### macOS/Linux
 
 ```bash
-cd Participants
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -58,6 +63,7 @@ python local_runner.py --track-id 1 --seed 42
 | `--seed` | 트랙 생성 시드 | `42` |
 | `--max-steps` | 에이전트 행동 횟수 상한 | `2000` |
 | `--frame-skip` | 한 행동을 유지할 raw frame 수 | `4` |
+| `--no-render` | GUI 창 없이 실행 | 사용 안 함 |
 
 `track-id`와 `seed`가 같으면 트랙과 장애물 배치가 동일합니다. `42`는 설치 확인을
 위한 예시이며 공식 평가 시드가 아닙니다. 공개 트랙 시드가 제공되면 해당 값을
@@ -92,9 +98,9 @@ class Agent:
 | shape | `(4, 84, 84)` |
 | 의미 | 최근 4개의 흑백 프레임 |
 | 값 범위 | `0.0`~`1.0` |
-| 현재 dtype | `float64` |
+| dtype | `float32` |
 
-PyTorch 모델이 `float32` 입력을 사용한다면 `act()` 안에서 변환하십시오.
+관측값은 PyTorch 모델에 바로 전달할 수 있는 `float32` 배열입니다.
 
 ```python
 state = torch.as_tensor(observation, dtype=torch.float32).unsqueeze(0)
@@ -121,16 +127,14 @@ NaN, 무한대, 잘못된 shape 또는 예외는 유효하지 않은 행동으�
 명시하여 로드하는 것을 권장합니다.
 
 ```python
-self.model_path = __file__[:-len("agent.py")] + "model.pth"
 self.model.load_state_dict(
-    torch.load(self.model_path, map_location="cpu")
+    torch.load("model.pth", map_location="cpu")
 )
 self.model.eval()
 ```
 
-공식 서버의 현재 작업 디렉터리는 제출 ZIP의 루트와 다를 수 있습니다. 따라서
-`torch.load("model.pth")`처럼 현재 작업 디렉터리에 의존하지 말고 위 예시처럼
-`__file__`을 기준으로 제출 파일의 경로를 만드십시오. 모델 추론 중에는 일반적으로
+공식 서버는 제출 ZIP의 루트에서 참가자 코드를 실행하므로 같은 디렉터리의 모델 파일을
+위와 같은 상대 경로로 불러올 수 있습니다. 모델 추론 중에는 일반적으로
 `torch.no_grad()`를 사용하십시오.
 
 ## 4. 실행 제한
@@ -210,10 +214,9 @@ self.model.eval()
 공식 랩타임은 초기 50 raw frame의 카메라 준비 구간이 끝난 시점부터 측정하며,
 환경 내부 시뮬레이션 시간을 밀리초 단위로 기록합니다.
 
-현재 `local_runner.py`가 출력하는 `공식 점수`는 완주 시 사용한 행동 스텝 수,
-미완주 시 `-진행률`을 표시하는 로컬 참고값입니다. 서버 순위의 완주 기록은 이 값이
-아니라 실제 시뮬레이션 랩타임을 사용합니다. `누적 보상`도 공식 순위 점수가 아니며,
-원본 CarRacing의 학습 보상으로 raw frame마다 `-0.1`, 처음 방문한 타일마다
+`local_runner.py`도 완주 시 같은 환경 내부 시뮬레이션 랩타임을 출력하고, 미완주
+시 진행률을 출력합니다. 함께 표시되는 `누적 보상`은 공식 순위 점수가 아니며 원본
+CarRacing의 학습 보상입니다. raw frame마다 `-0.1`, 처음 방문한 타일마다
 `+1000/N`이 적용됩니다.
 
 ## 8. 제출 ZIP
@@ -241,14 +244,14 @@ submission.zip
 
 | 항목 | 제한 |
 |---|---:|
-| ZIP 압축 파일 크기 | 최대 100 MB |
+| ZIP 압축 파일 크기 | 최대 500 MB |
 | ZIP 내부 파일 수 | 최대 1,000개 |
 | 압축 해제 후 전체 크기 | 최대 2 GB |
-| 개별 파일 크기 | 최대 10 MB |
+| 개별 파일 크기 | 최대 500 MB |
 | 개별 파일 압축률 | 최대 100배 |
 
-현재 개별 파일 제한이 10 MB이므로 `model.pth`를 포함한 모든 파일이 각각 10 MB를
-넘지 않아야 합니다. 여러 파일로 분할한 가중치를 사용할 때도 전체 메모리 제한을
+`model.pth`를 포함한 모든 개별 파일은 500 MB를 넘지 않아야 합니다. 모델을 여러
+파일로 나누더라도 ZIP과 압축 해제 후 전체 크기, 실행 시 메모리 제한을 모두
 준수해야 합니다.
 
 제출물의 모든 `.py` 파일은 정적 검사를 받습니다. 다음 import는 허용되지 않습니다.
@@ -274,7 +277,7 @@ compile, eval, exec, __import__
 - 모든 행동이 shape `(3,)`의 유한한 숫자인가?
 - CPU 환경에서 모델을 로드할 수 있는가?
 - 제공된 패키지만 사용하는가?
-- 각 모델 파일이 10 MB 이하인가?
+- ZIP과 각 모델 파일이 500 MB 이하인가?
 - 금지된 import와 함수가 없는가?
 - `.venv`, `__pycache__`, 학습 데이터 및 체크포인트 백업본을 제외했는가?
 
@@ -290,11 +293,29 @@ compile, eval, exec, __import__
 | `core/track_variables.py` | 결정적 장애물 배치 | 수정하지 않음 |
 | `core/obstacle_contacts.py` | 장애물 접촉 판정 | 수정하지 않음 |
 | `core/vendor/` | 공식 CarRacing 및 Box2D 차량 물리 | 수정하지 않음 |
+| `tests/` | 참가자판 계약 및 서버 공통 파일 동기화 검사 | 제출 불필요 |
+| `LICENSE` | 배포 및 vendored 코드 라이선스 | 수정하지 않음 |
 
 `core/`, `env_wrapper.py`, `damage.py`를 변경하면 로컬 결과가 공식 평가와 달라질 수
 있습니다. 이 파일들은 로컬 학습·테스트용이며 제출 ZIP에는 포함할 필요가 없습니다.
 
-## 10. 문제 확인
+## 10. 자동 테스트
+
+의존성을 설치한 환경에서 다음 명령으로 참가자판의 주요 계약을 확인할 수 있습니다.
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+테스트는 관측 shape·dtype, 행동 검증과 클리핑, 선택적 `reset()`, 충돌 손상 계산을
+확인합니다. 이 저장소와 `2026-HAIC` 서버 저장소가 같은 상위 디렉터리에 있으면 공통
+물리 파일이 서버와 동일한지도 함께 확인합니다.
+
+일반 참가자 환경에는 서버 저장소가 없으므로 서버 일치 테스트 1개가 `skipped`로
+표시되는 것이 정상입니다. 이 검사는 GitHub Actions에서 두 저장소를 함께 받아 자동으로
+실행됩니다. 나머지 테스트가 모두 `OK`인지 확인하십시오.
+
+## 11. 문제 확인
 
 환경 설치가 실패하면 다음 정보를 함께 확인하십시오.
 

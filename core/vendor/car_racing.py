@@ -1,9 +1,9 @@
 __credits__ = ["Andrea PIERRÉ"]
 
 # Vendored from gymnasium==0.29.1 (gymnasium/envs/box2d/car_racing.py).
-# Modified to accept a configurable ``grass_friction_multiplier`` and pass it
-# through to the vendored Car -- see docs/game-variables-design.md section
-# 3.2. Keep this file otherwise identical to upstream so future gymnasium
+# Modified to accept a configurable ``grass_friction_multiplier``, pass it
+# through to the vendored Car, and support deterministic physical obstacles.
+# Keep this file otherwise identical to upstream so future Gymnasium
 # diffs stay easy to review.
 
 import math
@@ -133,8 +133,7 @@ class VariablesContactDetector(FrictionDetector):
 
     Each obstacle counts once per continuous contact -- re-touching the same
     obstacle after fully separating (a new BeginContact following an
-    EndContact) counts again, matching how collision damage is conventionally
-    modeled in driving games (docs/game-variables-design.md section 4.3).
+    EndContact) counts again.
     """
 
     def _match_obstacle_contact(self, contact):

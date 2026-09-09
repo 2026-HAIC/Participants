@@ -1,0 +1,31 @@
+name: Verify participant template
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out participant repository
+        uses: actions/checkout@v4
+        with:
+          path: Participants
+
+      - name: Check out evaluation server
+        uses: actions/checkout@v4
+        with:
+          repository: 2026-HAIC/2026-HAIC
+          path: 2026-HAIC
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify files shared with the server
+        run: python -B -m unittest discover -s Participants/tests -p "test_server_parity.py" -v

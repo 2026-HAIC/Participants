@@ -13,14 +13,14 @@ class Agent:
 
     def reset(self, observation):
         """
-        [선택 구현] 매 트랙(에피소드)이 시작될 때마다 호출됩니다[cite: 1].
+        [선택 구현] 매 트랙(에피소드)이 시작될 때마다 호출됩니다.
         - 이전 트랙의 잔여 상태(RNN 히든 스테이트 등)를 초기화할 때 사용합니다.
         """
         pass
 
     def act(self, observation) -> np.ndarray:
         """
-        [필수 구현] 현재 관측 상태를 바탕으로 다음 행동을 결정합니다[cite: 1].
+        [필수 구현] 현재 관측 상태를 바탕으로 다음 행동을 결정합니다.
         
         :param observation: 현재 게임 화면 (Stacking 및 Grayscale 전처리 완료 상태)
         :return: np.ndarray shape (3,) 

@@ -1,7 +1,7 @@
 """Deterministic per-track physics variable configuration.
 
-Every value here must be a pure function of (track_id, seed) -- see
-docs/game-variables-design.md section 1.1. Never call unseeded random here.
+Every value here must be a pure function of (track_id, seed).
+Never call unseeded random here.
 """
 from __future__ import annotations
 
@@ -16,12 +16,11 @@ DEFAULT_GRASS_FRICTION_MULTIPLIER = 0.6
 
 0.35로 낮추는 방안을 휴리스틱 에이전트로 검증했으나 "그립이 낮을수록 나쁨"이라는
 방향을 일관되게 보여주지 못했다 -- 고정 규칙 컨트롤러는 그립 조건에 맞춰 행동을
-바꾸지 못해서, 낮은 그립이 항상 불리하게 작용하지 않았다 (docs/game-variables-design.md
-섹션 3 참고). 실제 학습된 모델로 재검증하기 전까지는 기본값을 유지한다.
+바꾸지 못해서, 낮은 그립이 항상 불리하게 작용하지 않았다. 실제 학습된 모델로
+재검증하기 전까지는 기본값을 유지한다.
 """
 
-# Phase 2-A tuning proposals from docs/game-variables-design.md section 4.2.
-# These are intentionally not final balance values.
+# Phase 2-A tuning values.
 OBSTACLE_COUNT = 6
 OBSTACLE_RADIUS = 1.2
 LATERAL_OFFSET_RATIO = 0.6

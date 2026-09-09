@@ -9,9 +9,8 @@ Created by Oleg Klimov
 ---
 Vendored from gymnasium==0.29.1 (gymnasium/envs/box2d/car_dynamics.py).
 Modified to accept a configurable ``grass_friction_multiplier`` instead of the
-hardcoded 0.6 and the Phase 2 v2 composite damage effects -- see
-docs/game-variables-design.md sections 3.2 and 4.5.1. Keep unrelated code
-identical to upstream so future gymnasium diffs stay easy to review.
+hardcoded 0.6 and to apply composite damage effects. Keep unrelated code
+identical to upstream so future Gymnasium diffs stay easy to review.
 """
 
 import math

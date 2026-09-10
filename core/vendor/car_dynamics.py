@@ -35,9 +35,6 @@ WHEEL_MOMENT_OF_INERTIA = 4000 * SIZE * SIZE
 FRICTION_LIMIT = (
     1000000 * SIZE * SIZE
 )  # friction ~= mass ~= size^2 (calculated implicitly using density)
-MIN_GRIP_MULTIPLIER = 0.6
-MIN_ENGINE_MULTIPLIER = 0.8
-MIN_STEERING_MULTIPLIER = 0.8
 WHEEL_R = 27
 WHEEL_W = 14
 WHEELPOS = [(-55, +80), (+55, +80), (-55, -82), (+55, -82)]
@@ -282,27 +279,30 @@ class Car:
             )
 
     @staticmethod
-    def _validate_effect(name, value, minimum):
+    def _validate_effect(name, value):
+        """Validate a damage multiplier against the physical invariant only.
+
+        The vehicle just needs a finite scale in (0.0, 1.0]; the actual balance
+        floors (how far grip/engine/steering may drop) live solely in the damage
+        model that computes these values (evaluator/rules.py). Keeping the floor
+        in one place means tuning it there can never be silently rejected here.
+        """
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise TypeError(f"{name} multiplier must be a number")
         value = float(value)
-        if not math.isfinite(value) or not minimum <= value <= 1.0:
+        if not math.isfinite(value) or not 0.0 < value <= 1.0:
             raise ValueError(
-                f"{name} multiplier must be finite and between {minimum} and 1.0"
+                f"{name} multiplier must be finite and within (0.0, 1.0]"
             )
         return value
 
     def set_damage_effects(
         self, grip_multiplier, engine_multiplier, steering_multiplier
     ):
-        """Atomically apply validated Phase 2 v2 damage effects."""
-        grip = self._validate_effect("grip", grip_multiplier, MIN_GRIP_MULTIPLIER)
-        engine = self._validate_effect(
-            "engine", engine_multiplier, MIN_ENGINE_MULTIPLIER
-        )
-        steering = self._validate_effect(
-            "steering", steering_multiplier, MIN_STEERING_MULTIPLIER
-        )
+        """Atomically apply validated composite damage effects."""
+        grip = self._validate_effect("grip", grip_multiplier)
+        engine = self._validate_effect("engine", engine_multiplier)
+        steering = self._validate_effect("steering", steering_multiplier)
         self.grip_multiplier = grip
         self.engine_multiplier = engine
         self.steering_multiplier = steering

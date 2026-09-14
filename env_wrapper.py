@@ -5,17 +5,11 @@ import numpy as np
 from damage import CollisionDamage
 
 def image_preprocessing(img):
-    """
-    이미지 해상도를 84x84로 축소하고 흑백으로 변환하여 연산량을 줄입니다.
-    """
     img = cv2.resize(img, dsize=(84, 84))
     img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     return (img / 255.0).astype(np.float32)
 
 class CarEnvironment(gym.Wrapper):
-    """
-    프레임 스킵과 스태킹을 적용한 커스텀 환경 래퍼입니다.
-    """
     def __init__(self, env, skip_frames=4, stack_frames=4, no_operation=50, max_off_track_steps=100, **kwargs):
         super().__init__(env, **kwargs)
         self._no_operation = no_operation
@@ -47,9 +41,7 @@ class CarEnvironment(gym.Wrapper):
     def reset(self, *, seed=None, options=None):
         observation, info = self.env.reset(seed=seed, options=options)
 
-        # 초기 시작 시 카메라 줌인 대기 시간 동안 아무 동작도 하지 않음
         for _ in range(self._no_operation):
-            # Continuous Action Space: [steer, gas, brake]
             observation, _, terminated, truncated, _ = self.env.step(np.array([0.0, 0.0, 0.0]))
             if terminated or truncated:
                 observation, info = self.env.reset(seed=seed, options=options)
@@ -62,10 +54,6 @@ class CarEnvironment(gym.Wrapper):
         return self.stack_state, info
 
     def step(self, action):
-        # pyBox2D의 SetMotorSpeed 바인딩은 numpy.float32 액션을 못 받아들이고
-        # TypeError를 던진다 (agent.py 더미 예시처럼 float32로 반환하는 모델이 흔함).
-        # 공식 서버는 _safe_act()의 np.clip이 우연히 float64로 승격시켜 이 문제를
-        # 피해가지만, 로컬 환경엔 그 계층이 없어서 여기서 직접 캐스팅한다.
         action = np.asarray(action, dtype=np.float64)
         total_reward = 0
         collision = False
@@ -79,9 +67,6 @@ class CarEnvironment(gym.Wrapper):
         crashed = self.damage.update(collision)
         self._apply_damage_effects()
 
-        # 공식 평가와 동일한 오프트랙 판별: 이번 스텝(프레임스킵 합산) 보상이
-        # 음수면(트랙을 못 밟았으면) 카운트, 양수로 돌아오면(트랙 복귀) 리셋.
-        # 연속으로 max_off_track_steps를 넘기면 리타이어.
         if total_reward < 0:
             self.off_track_counter += 1
         else:
@@ -111,7 +96,6 @@ class CarEnvironment(gym.Wrapper):
         return self.stack_state, total_reward, terminated, truncated, info
 
     def _calculate_progress(self) -> float:
-        """공식 채점과 동일한 진행률(0~1). 완주 기준(0.95)과 최종 점수 계산에 씁니다."""
         try:
             visited_tiles = self.unwrapped.tile_visited_count
             total_tiles = len(self.unwrapped.track)

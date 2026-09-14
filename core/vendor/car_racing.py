@@ -1,10 +1,5 @@
 __credits__ = ["Andrea PIERRÉ"]
 
-# Vendored from gymnasium==0.29.1 (gymnasium/envs/box2d/car_racing.py).
-# Modified to accept a configurable ``grass_friction_multiplier``, pass it
-# through to the vendored Car, and support deterministic physical obstacles.
-# Keep this file otherwise identical to upstream so future Gymnasium
-# diffs stay easy to review.
 
 import math
 from typing import Optional, Union
@@ -41,8 +36,6 @@ except ImportError as e:
     ) from e
 
 try:
-    # As pygame is necessary for using the environment (reset and step) even without a render mode
-    #   therefore, pygame is a necessary import for the environment.
     import pygame
     from pygame import gfxdraw
 except ImportError as e:
@@ -51,19 +44,19 @@ except ImportError as e:
     ) from e
 
 
-STATE_W = 96  # less than Atari 160x192
+STATE_W = 96
 STATE_H = 96
 VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
 
-SCALE = 6.0  # Track scale
-TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
-PLAYFIELD = 2000 / SCALE  # Game over boundary
-FPS = 50  # Frames per second
-ZOOM = 2.7  # Camera zoom
-ZOOM_FOLLOW = True  # Set to False for fixed view (don't use zoom)
+SCALE = 6.0
+TRACK_RAD = 900 / SCALE
+PLAYFIELD = 2000 / SCALE
+FPS = 50
+ZOOM = 2.7
+ZOOM_FOLLOW = True
 
 
 TRACK_DETAIL_STEP = 21 / SCALE
@@ -106,7 +99,6 @@ class FrictionDetector(contactListener):
         if not tile:
             return
 
-        # inherit tile color from env
         tile.color[:] = self.env.road_color
         if not obj or "tiles" not in obj.__dict__:
             return
@@ -117,7 +109,6 @@ class FrictionDetector(contactListener):
                 self.env.reward += 1000.0 / len(self.env.track)
                 self.env.tile_visited_count += 1
 
-                # Lap is considered completed if enough % of the track was covered
                 if (
                     tile.idx == 0
                     and self.env.tile_visited_count / len(self.env.track)
@@ -129,12 +120,6 @@ class FrictionDetector(contactListener):
 
 
 class VariablesContactDetector(FrictionDetector):
-    """Preserve road contacts and add per-encounter obstacle collision events.
-
-    Each obstacle counts once per continuous contact -- re-touching the same
-    obstacle after fully separating (a new BeginContact following an
-    EndContact) counts again.
-    """
 
     def _match_obstacle_contact(self, contact):
         if self.env.car is None:
@@ -159,91 +144,6 @@ class VariablesContactDetector(FrictionDetector):
 
 
 class CarRacing(gym.Env, EzPickle):
-    """
-    ## Description
-    The easiest control task to learn from pixels - a top-down
-    racing environment. The generated track is random every episode.
-
-    Some indicators are shown at the bottom of the window along with the
-    state RGB buffer. From left to right: true speed, four ABS sensors,
-    steering wheel position, and gyroscope.
-    To play yourself (it's rather fast for humans), type:
-    ```
-    python gymnasium/envs/box2d/car_racing.py
-    ```
-    Remember: it's a powerful rear-wheel drive car - don't press the accelerator
-    and turn at the same time.
-
-    ## Action Space
-    If continuous there are 3 actions :
-    - 0: steering, -1 is full left, +1 is full right
-    - 1: gas
-    - 2: breaking
-
-    If discrete there are 5 actions:
-    - 0: do nothing
-    - 1: steer left
-    - 2: steer right
-    - 3: gas
-    - 4: brake
-
-    ## Observation Space
-
-    A top-down 96x96 RGB image of the car and race track.
-
-    ## Rewards
-    The reward is -0.1 every frame and +1000/N for every track tile visited,
-    where N is the total number of tiles visited in the track. For example,
-    if you have finished in 732 frames, your reward is
-    1000 - 0.1*732 = 926.8 points.
-
-    ## Starting State
-    The car starts at rest in the center of the road.
-
-    ## Episode Termination
-    The episode finishes when all the tiles are visited. The car can also go
-    outside the playfield - that is, far off the track, in which case it will
-    receive -100 reward and die.
-
-    ## Arguments
-    `lap_complete_percent` dictates the percentage of tiles that must be visited by
-    the agent before a lap is considered complete.
-
-    Passing `domain_randomize=True` enables the domain randomized variant of the environment.
-    In this scenario, the background and track colours are different on every reset.
-
-    Passing `continuous=False` converts the environment to use discrete action space.
-    The discrete action space has 5 actions: [do nothing, left, right, gas, brake].
-
-    ## Reset Arguments
-    Passing the option `options["randomize"] = True` will change the current colour of the environment on demand.
-    Correspondingly, passing the option `options["randomize"] = False` will not change the current colour of the environment.
-    `domain_randomize` must be `True` on init for this argument to work.
-    Example usage:
-    ```python
-    import gymnasium as gym
-    env = gym.make("CarRacing-v1", domain_randomize=True)
-
-    # normal reset, this changes the colour scheme by default
-    env.reset()
-
-    # reset with colour scheme change
-    env.reset(options={"randomize": True})
-
-    # reset with no colour scheme change
-    env.reset(options={"randomize": False})
-    ```
-
-    ## Version History
-    - v1: Change track completion logic and add domain randomization (0.24.0)
-    - v0: Original version
-
-    ## References
-    - Chris Campbell (2014), http://www.iforce2d.net/b2dtut/top-down-car.
-
-    ## Credits
-    Created by Oleg Klimov
-    """
 
     metadata = {
         "render_modes": [
@@ -301,16 +201,13 @@ class CarRacing(gym.Env, EzPickle):
             shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
         )
 
-        # This will throw a warning in tests/envs/test_envs in utils/env_checker.py as the space is not symmetric
-        #   or normalised however this is not possible here so ignore
         if self.continuous:
             self.action_space = spaces.Box(
                 np.array([-1, 0, 0]).astype(np.float32),
                 np.array([+1, +1, +1]).astype(np.float32),
-            )  # steer, gas, brake
+            )
         else:
             self.action_space = spaces.Discrete(5)
-            # do nothing, left, right, gas, brake
 
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8
@@ -319,13 +216,11 @@ class CarRacing(gym.Env, EzPickle):
         self.render_mode = render_mode
 
     def _detach_contact_listener(self):
-        """Detach native callbacks before destroying any contacted bodies."""
         self.world.contactListener = None
         self.world.contactListener_bug_workaround = None
         self.contactListener_keepref = None
 
     def _attach_contact_listener(self):
-        """Install and retain the listener used by the next physics step."""
         listener = VariablesContactDetector(self, self.lap_complete_percent)
         self.world.contactListener_bug_workaround = listener
         self.world.contactListener = listener
@@ -355,7 +250,6 @@ class CarRacing(gym.Env, EzPickle):
 
     def _init_colors(self):
         if self.domain_randomize:
-            # domain randomize the bg and grass colour
             self.road_color = self.np_random.uniform(0, 210, size=3)
 
             self.bg_color = self.np_random.uniform(0, 210, size=3)
@@ -364,7 +258,6 @@ class CarRacing(gym.Env, EzPickle):
             idx = self.np_random.integers(3)
             self.grass_color[idx] += 20
         else:
-            # default colours
             self.road_color = np.array([102, 102, 102])
             self.bg_color = np.array([102, 204, 102])
             self.grass_color = np.array([102, 230, 102])
@@ -375,7 +268,6 @@ class CarRacing(gym.Env, EzPickle):
         ), "domain_randomize must be True to use this function."
 
         if randomize:
-            # domain randomize the bg and grass colour
             self.road_color = self.np_random.uniform(0, 210, size=3)
 
             self.bg_color = self.np_random.uniform(0, 210, size=3)
@@ -387,7 +279,6 @@ class CarRacing(gym.Env, EzPickle):
     def _create_track(self):
         CHECKPOINTS = 12
 
-        # Create checkpoints
         checkpoints = []
         for c in range(CHECKPOINTS):
             noise = self.np_random.uniform(0, 2 * math.pi * 1 / CHECKPOINTS)
@@ -405,7 +296,6 @@ class CarRacing(gym.Env, EzPickle):
             checkpoints.append((alpha, rad * math.cos(alpha), rad * math.sin(alpha)))
         self.road = []
 
-        # Go from one checkpoint to another to create track
         x, y, beta = 1.5 * TRACK_RAD, 0, 0
         dest_i = 0
         laps = 0
@@ -421,7 +311,7 @@ class CarRacing(gym.Env, EzPickle):
                 visited_other_side = True
                 alpha += 2 * math.pi
 
-            while True:  # Find destination from checkpoints
+            while True:
                 failed = True
 
                 while True:
@@ -443,9 +333,8 @@ class CarRacing(gym.Env, EzPickle):
             r1y = math.sin(beta)
             p1x = -r1y
             p1y = r1x
-            dest_dx = dest_x - x  # vector towards destination
+            dest_dx = dest_x - x
             dest_dy = dest_y - y
-            # destination vector projected on rad:
             proj = r1x * dest_dx + r1y * dest_dy
             while beta - alpha > 1.5 * math.pi:
                 beta -= 2 * math.pi
@@ -466,13 +355,12 @@ class CarRacing(gym.Env, EzPickle):
             if no_freeze == 0:
                 break
 
-        # Find closed loop range i1..i2, first loop should be ignored, second is OK
         i1, i2 = -1, -1
         i = len(track)
         while True:
             i -= 1
             if i == 0:
-                return False  # Failed
+                return False
             pass_through_start = (
                 track[i][0] > self.start_alpha and track[i - 1][0] <= self.start_alpha
             )
@@ -491,7 +379,6 @@ class CarRacing(gym.Env, EzPickle):
         first_beta = track[0][1]
         first_perp_x = math.cos(first_beta)
         first_perp_y = math.sin(first_beta)
-        # Length of perpendicular jump to put together head and tail
         well_glued_together = np.sqrt(
             np.square(first_perp_x * (track[0][2] - track[-1][2]))
             + np.square(first_perp_y * (track[0][3] - track[-1][3]))
@@ -499,7 +386,6 @@ class CarRacing(gym.Env, EzPickle):
         if well_glued_together > TRACK_DETAIL_STEP:
             return False
 
-        # Red-white border on hard turns
         border = [False] * len(track)
         for i in range(len(track)):
             good = True
@@ -515,7 +401,6 @@ class CarRacing(gym.Env, EzPickle):
             for neg in range(BORDER_MIN_COUNT):
                 border[i - neg] |= border[i]
 
-        # Create tiles
         for i in range(len(track)):
             alpha1, beta1, x1, y1 = track[i]
             alpha2, beta2, x2, y2 = track[i - 1]
@@ -584,9 +469,6 @@ class CarRacing(gym.Env, EzPickle):
         reset_options = dict(options or {})
         track_id = reset_options.get("track_id")
 
-        # Official scoring/replay always supplies track_id. Keeping it optional
-        # preserves the normal Gymnasium reset contract for local callers, but
-        # missing context must clear (never reuse) the previous official track.
         self.track_id = None
         self.track_seed = None
         self.track_variables = None
@@ -673,17 +555,12 @@ class CarRacing(gym.Env, EzPickle):
         step_reward = 0
         terminated = False
         truncated = False
-        if action is not None:  # First step without action, called from reset()
+        if action is not None:
             self.reward -= 0.1
-            # We actually don't want to count fuel spent, we want car to be faster.
-            # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.car.fuel_spent = 0.0
             step_reward = self.reward - self.prev_reward
             self.prev_reward = self.reward
             if self.tile_visited_count == len(self.track) or self.new_lap:
-                # Truncation due to finishing lap
-                # This should not be treated as a failure
-                # but like a timeout
                 truncated = True
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
@@ -720,14 +597,12 @@ class CarRacing(gym.Env, EzPickle):
             self.clock = pygame.time.Clock()
 
         if "t" not in self.__dict__:
-            return  # reset() not called yet
+            return
 
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
 
         assert self.car is not None
-        # computing transformations
         angle = -self.car.hull.angle
-        # Animating first second zoom.
         zoom = 0.1 * SCALE * max(1 - self.t, 0) + ZOOM * SCALE * min(self.t, 1)
         scroll_x = -(self.car.hull.position[0]) * zoom
         scroll_y = -(self.car.hull.position[1]) * zoom
@@ -746,7 +621,6 @@ class CarRacing(gym.Env, EzPickle):
 
         self.surf = pygame.transform.flip(self.surf, False, True)
 
-        # showing stats
         self._render_indicators(WINDOW_W, WINDOW_H)
 
         font = pygame.font.Font(pygame.font.get_default_font(), 42)
@@ -778,12 +652,10 @@ class CarRacing(gym.Env, EzPickle):
             (-bounds, bounds),
         ]
 
-        # draw background
         self._draw_colored_polygon(
             self.surf, field, self.bg_color, zoom, translation, angle, clip=False
         )
 
-        # draw grass patches
         grass = []
         for x in range(-20, 20, 2):
             for y in range(-20, 20, 2):
@@ -800,9 +672,7 @@ class CarRacing(gym.Env, EzPickle):
                 self.surf, poly, self.grass_color, zoom, translation, angle
             )
 
-        # draw road
         for poly, color in self.road_poly:
-            # converting to pixel coordinates
             poly = [(p[0], p[1]) for p in poly]
             color = [int(c) for c in color]
             self._draw_colored_polygon(self.surf, poly, color, zoom, translation, angle)
@@ -851,13 +721,11 @@ class CarRacing(gym.Env, EzPickle):
             + np.square(self.car.hull.linearVelocity[1])
         )
 
-        # simple wrapper to render if the indicator value is above a threshold
         def render_if_min(value, points, color):
             if abs(value) > 1e-4:
                 pygame.draw.polygon(self.surf, points=points, color=color)
 
         render_if_min(true_speed, vertical_ind(5, 0.02 * true_speed), (255, 255, 255))
-        # ABS sensors
         render_if_min(
             self.car.wheels[0].omega,
             vertical_ind(7, 0.01 * self.car.wheels[0].omega),
@@ -897,11 +765,6 @@ class CarRacing(gym.Env, EzPickle):
         poly = [
             (c[0] * zoom + translation[0], c[1] * zoom + translation[1]) for c in poly
         ]
-        # This checks if the polygon is out of bounds of the screen, and we skip drawing if so.
-        # Instead of calculating exactly if the polygon and screen overlap,
-        # we simply check if the polygon is in a larger bounding box whose dimension
-        # is greater than the screen by MAX_SHAPE_DIM, which is the maximum
-        # diagonal length of an environment object
         if not clip or any(
             (-MAX_SHAPE_DIM <= coord[0] <= WINDOW_W + MAX_SHAPE_DIM)
             and (-MAX_SHAPE_DIM <= coord[1] <= WINDOW_H + MAX_SHAPE_DIM)
@@ -938,7 +801,7 @@ if __name__ == "__main__":
                 if event.key == pygame.K_UP:
                     a[1] = +1.0
                 if event.key == pygame.K_DOWN:
-                    a[2] = +0.8  # set 1.0 for wheels to block to zero rotation
+                    a[2] = +0.8
                 if event.key == pygame.K_RETURN:
                     restart = True
                 if event.key == pygame.K_ESCAPE:

@@ -1,1 +1,0 @@
-"""Participant template contract tests."""

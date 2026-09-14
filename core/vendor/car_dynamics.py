@@ -1,18 +1,3 @@
-"""
-Top-down car dynamics simulation.
-
-Some ideas are taken from this great tutorial http://www.iforce2d.net/b2dtut/top-down-car by Chris Campbell.
-This simulation is a bit more detailed, with wheels rotation.
-
-Created by Oleg Klimov
-
----
-Vendored from gymnasium==0.29.1 (gymnasium/envs/box2d/car_dynamics.py).
-Modified to accept a configurable ``grass_friction_multiplier`` instead of the
-hardcoded 0.6 and to apply composite damage effects. Keep unrelated code
-identical to upstream so future Gymnasium diffs stay easy to review.
-"""
-
 import math
 
 import Box2D
@@ -34,7 +19,7 @@ ENGINE_POWER = 100000000 * SIZE * SIZE
 WHEEL_MOMENT_OF_INERTIA = 4000 * SIZE * SIZE
 FRICTION_LIMIT = (
     1000000 * SIZE * SIZE
-)  # friction ~= mass ~= size^2 (calculated implicitly using density)
+)
 WHEEL_R = 27
 WHEEL_W = 14
 WHEELPOS = [(-55, +80), (+55, +80), (-55, -82), (+55, -82)]
@@ -125,8 +110,8 @@ class Car:
             w.gas = 0.0
             w.brake = 0.0
             w.steer = 0.0
-            w.phase = 0.0  # wheel angle
-            w.omega = 0.0  # angular velocity
+            w.phase = 0.0
+            w.omega = 0.0
             w.skid_start = None
             w.skid_particle = None
             rjd = revoluteJointDef(
@@ -149,48 +134,31 @@ class Car:
         self.particles = []
 
     def gas(self, gas):
-        """control: rear wheel drive
-
-        Args:
-            gas (float): How much gas gets applied. Gets clipped between 0 and 1.
-        """
         gas = np.clip(gas, 0, 1)
         for w in self.wheels[2:4]:
             diff = gas - w.gas
             if diff > 0.1:
-                diff = 0.1  # gradually increase, but stop immediately
+                diff = 0.1
             w.gas += diff
 
     def brake(self, b):
-        """control: brake
-
-        Args:
-            b (0..1): Degree to which the brakes are applied. More than 0.9 blocks the wheels to zero rotation
-        """
         for w in self.wheels:
             w.brake = b
 
     def steer(self, s):
-        """control: steer
-
-        Args:
-            s (-1..1): target position, it takes time to rotate steering wheel from side-to-side
-        """
         self.wheels[0].steer = s
         self.wheels[1].steer = s
 
     def step(self, dt):
         for w in self.wheels:
-            # Steer each wheel
             dir = np.sign(w.steer - w.joint.angle)
             val = abs(w.steer - w.joint.angle)
             w.joint.motorSpeed = (
                 dir * min(50.0 * val, 3.0) * self.steering_multiplier
             )
 
-            # Position => friction_limit
             grass = True
-            friction_limit = FRICTION_LIMIT * self.grass_friction_multiplier  # Grass friction if no tile
+            friction_limit = FRICTION_LIMIT * self.grass_friction_multiplier
             for tile in w.tiles:
                 friction_limit = max(
                     friction_limit, FRICTION_LIMIT * tile.road_friction
@@ -198,18 +166,13 @@ class Car:
                 grass = False
             friction_limit *= self.grip_multiplier
 
-            # Force
             forw = w.GetWorldVector((0, 1))
             side = w.GetWorldVector((1, 0))
             v = w.linearVelocity
-            vf = forw[0] * v[0] + forw[1] * v[1]  # forward speed
-            vs = side[0] * v[0] + side[1] * v[1]  # side speed
+            vf = forw[0] * v[0] + forw[1] * v[1]
+            vs = side[0] * v[0] + side[1] * v[1]
 
-            # WHEEL_MOMENT_OF_INERTIA*np.square(w.omega)/2 = E -- energy
-            # WHEEL_MOMENT_OF_INERTIA*w.omega * domega/dt = dE/dt = W -- power
-            # domega = dt*W/WHEEL_MOMENT_OF_INERTIA/w.omega
 
-            # add small coef not to divide by zero
             w.omega += (
                 dt
                 * (ENGINE_POWER * self.engine_multiplier)
@@ -222,27 +185,23 @@ class Car:
             if w.brake >= 0.9:
                 w.omega = 0
             elif w.brake > 0:
-                BRAKE_FORCE = 15  # radians per second
+                BRAKE_FORCE = 15
                 dir = -np.sign(w.omega)
                 val = BRAKE_FORCE * w.brake
                 if abs(val) > abs(w.omega):
-                    val = abs(w.omega)  # low speed => same as = 0
+                    val = abs(w.omega)
                 w.omega += dir * val
             w.phase += w.omega * dt
 
-            vr = w.omega * w.wheel_rad  # rotating wheel speed
-            f_force = -vf + vr  # force direction is direction of speed difference
+            vr = w.omega * w.wheel_rad
+            f_force = -vf + vr
             p_force = -vs
 
-            # Physically correct is to always apply friction_limit until speed is equal.
-            # But dt is finite, that will lead to oscillations if difference is already near zero.
 
-            # Random coefficient to cut oscillations in few steps (have no effect on friction_limit)
             f_force *= 205000 * SIZE * SIZE
             p_force *= 205000 * SIZE * SIZE
             force = np.sqrt(np.square(f_force) + np.square(p_force))
 
-            # Skid trace
             if abs(force) > 2.0 * friction_limit:
                 if (
                     w.skid_particle
@@ -264,7 +223,7 @@ class Car:
             if abs(force) > friction_limit:
                 f_force /= force
                 p_force /= force
-                force = friction_limit  # Correct physics here
+                force = friction_limit
                 f_force *= force
                 p_force *= force
 
@@ -280,13 +239,6 @@ class Car:
 
     @staticmethod
     def _validate_effect(name, value):
-        """Validate a damage multiplier against the physical invariant only.
-
-        The vehicle just needs a finite scale in (0.0, 1.0]; the actual balance
-        floors (how far grip/engine/steering may drop) live solely in the damage
-        model that computes these values (evaluator/rules.py). Keeping the floor
-        in one place means tuning it there can never be silently rejected here.
-        """
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise TypeError(f"{name} multiplier must be a number")
         value = float(value)
@@ -299,7 +251,6 @@ class Car:
     def set_damage_effects(
         self, grip_multiplier, engine_multiplier, steering_multiplier
     ):
-        """Atomically apply validated composite damage effects."""
         grip = self._validate_effect("grip", grip_multiplier)
         engine = self._validate_effect("engine", engine_multiplier)
         steering = self._validate_effect("steering", steering_multiplier)
@@ -344,7 +295,7 @@ class Car:
                 if "phase" not in obj.__dict__:
                     continue
                 a1 = obj.phase
-                a2 = obj.phase + 1.2  # radians
+                a2 = obj.phase + 1.2
                 s1 = math.sin(a1)
                 s2 = math.sin(a2)
                 c1 = math.cos(a1)

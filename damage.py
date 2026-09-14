@@ -1,4 +1,3 @@
-"""Collision damage policy shared with the official HAIC simulator."""
 from dataclasses import dataclass
 
 DAMAGE_PER_COLLISION = 0.2
@@ -16,7 +15,6 @@ class DamageEffects:
 
 
 def calculate_damage_effects(damage: float) -> DamageEffects:
-    """Convert normalized damage into the official vehicle multipliers."""
     return DamageEffects(
         grip_multiplier=max(MIN_GRIP_MULTIPLIER, 1.0 - damage * 0.5),
         engine_multiplier=max(MIN_ENGINE_MULTIPLIER, 1.0 - damage * 0.25),
@@ -25,7 +23,6 @@ def calculate_damage_effects(damage: float) -> DamageEffects:
 
 
 class CollisionDamage:
-    """Track collision damage once per wrapped environment step."""
 
     def __init__(self) -> None:
         self.damage = 0.0

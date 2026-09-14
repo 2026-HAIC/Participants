@@ -15,7 +15,6 @@ NO_OP_ACTION = np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
 
 def safe_act(agent, observation, timeout_sec=DEFAULT_AGENT_TIMEOUT_SECONDS):
-    """Apply the same action validation and clipping as the official server."""
     outcome = []
 
     def call():
@@ -39,7 +38,6 @@ def safe_act(agent, observation, timeout_sec=DEFAULT_AGENT_TIMEOUT_SECONDS):
 
 
 def safe_reset(agent, observation, timeout_sec=DEFAULT_AGENT_TIMEOUT_SECONDS):
-    """Call the optional reset method with the official per-call timeout."""
     if not hasattr(agent, "reset"):
         return
 

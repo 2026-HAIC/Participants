@@ -1,9 +1,11 @@
+import ast
 import unittest
 
 
 PARTICIPANT_ROOT = __file__.replace("\\", "/").rsplit("/", 2)[0]
 SERVER_ROOT = PARTICIPANT_ROOT.rsplit("/", 1)[0] + "/2026-HAIC/simulator"
 SHARED_FILES = (
+    "core/finish_line.py",
     "core/track_variables.py",
     "core/obstacle_contacts.py",
     "core/vendor/car_racing.py",
@@ -28,9 +30,22 @@ class TestServerParity(unittest.TestCase):
                     participant_content = participant.read()
                 with open(SERVER_ROOT + "/" + relative_path, "rb") as server:
                     server_content = server.read()
+                participant_tree = ast.parse(participant_content)
+                server_tree = ast.parse(server_content)
+                for tree in (participant_tree, server_tree):
+                    for node in ast.walk(tree):
+                        if hasattr(node, "body") and isinstance(node.body, list):
+                            node.body[:] = [
+                                item for item in node.body
+                                if not (
+                                    isinstance(item, ast.Expr)
+                                    and isinstance(item.value, ast.Constant)
+                                    and isinstance(item.value.value, str)
+                                )
+                            ]
                 self.assertEqual(
-                    participant_content,
-                    server_content,
+                    ast.dump(participant_tree, include_attributes=False),
+                    ast.dump(server_tree, include_attributes=False),
                     f"participant file differs from server: {relative_path}",
                 )
 

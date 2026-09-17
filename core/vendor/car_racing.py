@@ -23,6 +23,7 @@ from core.track_variables import (
     validate_track_id,
     with_obstacles,
 )
+from core.finish_line import FinishLineTracker
 
 from core.vendor.car_dynamics import Car
 
@@ -108,13 +109,6 @@ class FrictionDetector(contactListener):
                 tile.road_visited = True
                 self.env.reward += 1000.0 / len(self.env.track)
                 self.env.tile_visited_count += 1
-
-                if (
-                    tile.idx == 0
-                    and self.env.tile_visited_count / len(self.env.track)
-                    > self.lap_complete_percent
-                ):
-                    self.env.new_lap = True
         else:
             obj.tiles.remove(tile)
 
@@ -197,6 +191,9 @@ class CarRacing(gym.Env, EzPickle):
         self.prev_reward = 0.0
         self.verbose = verbose
         self.new_lap = False
+        self.finish_line_tracker: FinishLineTracker | None = None
+        self.finish_qualified_time_s: float | None = None
+        self.finish_time_s: float | None = None
         self.fd_tile = fixtureDef(
             shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
         )
@@ -491,6 +488,9 @@ class CarRacing(gym.Env, EzPickle):
         self.tile_visited_count = 0
         self.t = 0.0
         self.new_lap = False
+        self.finish_line_tracker = None
+        self.finish_qualified_time_s = None
+        self.finish_time_s = None
         self.road_poly = []
 
         if self.domain_randomize:
@@ -523,6 +523,14 @@ class CarRacing(gym.Env, EzPickle):
         self.car = Car(
             self.world, *self.track[0][1:4], grass_friction_multiplier=self.grass_friction_multiplier,
         )
+        start_beta, start_x, start_y = self.track[0][1:4]
+        self.finish_line_tracker = FinishLineTracker(
+            center=(float(start_x), float(start_y)),
+            forward=(-math.sin(start_beta), math.cos(start_beta)),
+            half_width=TRACK_WIDTH,
+            half_depth=TRACK_DETAIL_STEP * 0.25,
+            qualification_ratio=self.lap_complete_percent,
+        )
 
         if self.render_mode == "human":
             self.render()
@@ -549,6 +557,18 @@ class CarRacing(gym.Env, EzPickle):
         self.car.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
+        tracker = self.finish_line_tracker
+        if tracker is not None:
+            progress = self.tile_visited_count / len(self.track) if self.track else 0.0
+            tracker.update(
+                tuple(self.car.hull.position),
+                tuple(self.car.hull.linearVelocity),
+                progress,
+                self.t,
+            )
+            self.finish_qualified_time_s = tracker.qualified_time_s
+            self.finish_time_s = tracker.finish_time_s
+            self.new_lap = self.finish_time_s is not None
 
         self.state = self._render("state_pixels")
 
@@ -560,7 +580,7 @@ class CarRacing(gym.Env, EzPickle):
             self.car.fuel_spent = 0.0
             step_reward = self.reward - self.prev_reward
             self.prev_reward = self.reward
-            if self.tile_visited_count == len(self.track) or self.new_lap:
+            if self.new_lap:
                 truncated = True
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
@@ -571,6 +591,8 @@ class CarRacing(gym.Env, EzPickle):
             self.render()
         return self.state, step_reward, terminated, truncated, {
             "collision": self._collision_this_step,
+            "finished": self.finish_time_s is not None,
+            "finish_time_s": self.finish_time_s,
         }
 
     def render(self):

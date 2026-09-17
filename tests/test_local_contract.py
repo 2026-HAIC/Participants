@@ -7,6 +7,7 @@ import numpy as np
 from damage import CollisionDamage
 from env_wrapper import CarEnvironment, image_preprocessing
 from local_runner import safe_act, safe_reset
+from core.finish_line import FinishLineTracker
 
 
 class TestAgentContract(unittest.TestCase):
@@ -75,13 +76,24 @@ class _DummyEnvironment(gym.Env):
         self.car = _DummyCar()
         self.track = [None] * 10
         self.tile_visited_count = 0
+        self.raw_steps = 0
+        self.finish_on_raw_step = None
+        self.finish_qualified_time_s = None
+        self.finish_time_s = None
 
     def reset(self, *, seed=None, options=None):
         return np.zeros((96, 96, 3), dtype=np.uint8), {}
 
     def step(self, action):
-        return np.full((96, 96, 3), 255, dtype=np.uint8), 0.0, False, False, {
+        self.raw_steps += 1
+        finished = self.raw_steps == self.finish_on_raw_step
+        if finished:
+            self.finish_qualified_time_s = 0.02
+            self.finish_time_s = 0.04
+        return np.full((96, 96, 3), 255, dtype=np.uint8), 0.0, False, finished, {
             "collision": False,
+            "finished": finished,
+            "finish_time_s": self.finish_time_s,
         }
 
 
@@ -112,6 +124,77 @@ class TestEnvironmentContract(unittest.TestCase):
             self.assertFalse(damage.update(True))
         self.assertTrue(damage.update(True))
         self.assertEqual(damage.damage, 1.0)
+
+    def test_frame_skip_stops_on_second_raw_finish_tick(self):
+        raw_environment = _DummyEnvironment()
+        raw_environment.finish_on_raw_step = 2
+        environment = CarEnvironment(raw_environment, no_operation=0, skip_frames=4)
+        environment.reset()
+
+        _, _, terminated, truncated, info = environment.step([0.0, 0.0, 0.0])
+
+        self.assertFalse(terminated)
+        self.assertTrue(truncated)
+        self.assertEqual(raw_environment.raw_steps, 2)
+        self.assertEqual(info["finish_time_s"], 0.04)
+        self.assertTrue(info["finished"])
+
+
+class TestFinishLineTracker(unittest.TestCase):
+    def tracker(self):
+        tracker = FinishLineTracker((0.0, 0.0), (1.0, 0.0), 2.0, 0.5)
+        tracker.update((-1.0, 0.0), (1.0, 0.0), 0.0, 0.02)
+        return tracker
+
+    def cross(self, tracker, progress=0.95, velocity=(1.0, 0.0)):
+        tracker.update((-0.4, 0.0), velocity, progress, 0.20)
+        tracker.update((0.1, 0.0), velocity, progress, 0.23)
+        return tracker.update((0.6, 0.0), velocity, progress, 0.28)
+
+    def test_below_qualification_does_not_finish(self):
+        tracker = self.tracker()
+        self.assertFalse(self.cross(tracker, 0.94))
+        self.assertIsNone(tracker.finish_time_s)
+
+    def test_qualification_without_crossing_does_not_finish(self):
+        tracker = self.tracker()
+        tracker.update((-1.0, 0.0), (1.0, 0.0), 0.95, 0.20)
+        self.assertIsNotNone(tracker.qualified_time_s)
+        self.assertIsNone(tracker.finish_time_s)
+
+    def test_forward_crossing_finishes_at_center_tick(self):
+        tracker = self.tracker()
+        self.assertTrue(self.cross(tracker))
+        self.assertEqual(tracker.qualified_time_s, 0.20)
+        self.assertEqual(tracker.finish_time_s, 0.23)
+
+    def test_reverse_crossing_does_not_finish(self):
+        tracker = self.tracker()
+        self.assertFalse(self.cross(tracker, velocity=(-1.0, 0.0)))
+        self.assertIsNone(tracker.finish_time_s)
+
+    def test_initial_contact_does_not_finish(self):
+        tracker = FinishLineTracker((0.0, 0.0), (1.0, 0.0), 2.0, 0.5)
+        tracker.update((0.1, 0.0), (1.0, 0.0), 0.95, 0.02)
+        tracker.update((0.6, 0.0), (1.0, 0.0), 0.95, 0.04)
+        self.assertIsNone(tracker.finish_time_s)
+
+    def test_lateral_departure_and_stationary_crossing_do_not_finish(self):
+        lateral = self.tracker()
+        lateral.update((-0.4, 0.0), (1.0, 5.0), 0.95, 0.20)
+        lateral.update((0.1, 0.0), (1.0, 5.0), 0.95, 0.23)
+        lateral.update((0.6, 3.0), (1.0, 5.0), 0.95, 0.28)
+        self.assertIsNone(lateral.finish_time_s)
+
+        stationary = self.tracker()
+        self.assertFalse(self.cross(stationary, velocity=(0.0, 0.0)))
+        self.assertIsNone(stationary.finish_time_s)
+
+    def test_finish_time_is_immutable(self):
+        tracker = self.tracker()
+        self.assertTrue(self.cross(tracker))
+        tracker.update((1.0, 0.0), (1.0, 0.0), 1.0, 1.0)
+        self.assertEqual(tracker.finish_time_s, 0.23)
 
 
 if __name__ == "__main__":

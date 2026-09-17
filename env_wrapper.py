@@ -90,6 +90,10 @@ class CarEnvironment(gym.Wrapper):
             damage=self.damage.damage,
             damage_effects=self.damage.effects,
             progress=progress,
+            finish_qualified=getattr(self.unwrapped, "finish_qualified_time_s", None) is not None,
+            finish_qualified_time_s=getattr(self.unwrapped, "finish_qualified_time_s", None),
+            finish_time_s=getattr(self.unwrapped, "finish_time_s", None),
+            finished=getattr(self.unwrapped, "finish_time_s", None) is not None,
             retire_reason=retire_reason,
         )
         terminated = terminated or crashed or off_track

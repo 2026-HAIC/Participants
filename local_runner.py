@@ -12,6 +12,7 @@ from env_wrapper import CarEnvironment
 DEFAULT_AGENT_TIMEOUT_SECONDS = 5.0
 MAX_INVALID_ACTIONS = 10
 NO_OP_ACTION = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+GAME_VARIABLES_VERSION = "variables-6"
 
 
 def safe_act(agent, observation, timeout_sec=DEFAULT_AGENT_TIMEOUT_SECONDS):
@@ -116,8 +117,10 @@ def run_local_test(track_id, seed, max_steps, frame_skip, render_mode="human"):
                 )
 
         progress = env._calculate_progress()
-        elapsed_seconds = max(0.0, float(env.unwrapped.t - start_time))
-        completed = progress >= 0.95
+        finish_time_s = env.unwrapped.finish_time_s
+        finish_qualified = env.unwrapped.finish_qualified_time_s is not None
+        completed = finish_time_s is not None
+        lap_time_ms = round((finish_time_s - start_time) * 1000) if completed else None
         retire_reason = local_retire_reason or info.get("retire_reason")
         if not completed and retire_reason is None:
             if terminated:
@@ -126,13 +129,16 @@ def run_local_test(track_id, seed, max_steps, frame_skip, render_mode="human"):
                 retire_reason = "max_steps"
 
         print("=== 종료: 로컬 환경 테스트 ===")
-        print(f"최종 스텝: {steps}")
+        print(f"trackId: {track_id}")
+        print(f"seed: {seed}")
+        print(f"variables version: {GAME_VARIABLES_VERSION}")
+        print(f"simulation agent steps: {steps}")
         print(f"최종 누적 보상: {total_reward:.2f}")
-        print(f"진행률: {progress:.1%}")
-        if completed:
-            print(f"공식 평가 기준 랩타임: {elapsed_seconds:.3f}초")
-        else:
-            print(f"미완주 기록: 진행률 {progress:.1%}")
+        print(f"progress: {progress:.6f}")
+        print(f"finish qualified: {finish_qualified}")
+        print(f"finish_time_s: {finish_time_s}")
+        print(f"lapTimeMs: {lap_time_ms}")
+        print("FINISHED" if completed else "DNF")
         if retire_reason:
             print(f"리타이어 사유: {retire_reason}")
     finally:
